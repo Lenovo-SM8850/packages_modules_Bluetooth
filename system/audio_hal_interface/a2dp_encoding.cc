@@ -196,7 +196,12 @@ bool is_opus_supported() {
   return false;
 }
 
-bool is_aptx_adaptive_offload_enabled() { return false; }
+bool is_aptx_adaptive_offload_enabled() {
+  if (HalVersionManager::GetHalTransport() == BluetoothAudioHalTransport::AIDL) {
+    return aidl::a2dp::is_aptx_adaptive_offload_enabled();
+  }
+  return false;
+}
 
 namespace provider {
 

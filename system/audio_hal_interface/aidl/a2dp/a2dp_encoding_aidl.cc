@@ -260,6 +260,11 @@ bool setup_codec(const ahal_codec_configuration& config) {
     return active_hal_interface->UpdateAudioConfig(audio_config);
   }
 
+  if (config.codec_config.codec_type == BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE) {
+    log::error("aptX Adaptive has no software encoding session:\n{}", config.ToString());
+    return false;
+  }
+
   // Compute the PCM configuration for the software encoding session and
   // check if the parameters are supported.
   if (getHalPcmConfiguration(config, &pcm_config)) {
@@ -431,6 +436,8 @@ void set_remote_delay(uint16_t delay_report) {
   log::debug("DELAY {} ms", static_cast<float>(delay_report / 10.0));
   active_hal_interface->GetTransportInstance()->SetRemoteDelay(delay_report);
 }
+
+bool is_aptx_adaptive_offload_enabled() { return codec::IsAptxAdaptiveOffloadEnabled(); }
 
 // Set low latency buffer mode allowed or disallowed
 void set_low_latency_mode_allowed(bool allowed) {

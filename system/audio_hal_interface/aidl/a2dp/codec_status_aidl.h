@@ -33,6 +33,10 @@ using ::bluetooth::audio::a2dp::ahal_codec_configuration;
 bool UpdateOffloadingCapabilities(
         const std::vector<btav_a2dp_codec_config_t>& framework_preference);
 
+/// Return true if the audio HAL offloads aptX Adaptive and it is part of the
+/// offloading preference set by UpdateOffloadingCapabilities.
+bool IsAptxAdaptiveOffloadEnabled();
+
 /// Return the pcm configuration to be used for the software encoding audio
 /// session with the Bluetooth Audio HAL. Returns false if the
 /// negotiated codec capabilities are not supported by the

@@ -93,6 +93,11 @@ void set_remote_delay(uint16_t delay_report);
  ***/
 void set_low_latency_mode_allowed(bool allowed);
 
+/***
+ * Check if the audio HAL offloads aptX Adaptive
+ ***/
+bool is_aptx_adaptive_offload_enabled();
+
 namespace provider {
 
 /***
