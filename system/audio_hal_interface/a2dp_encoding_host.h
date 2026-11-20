@@ -56,6 +56,8 @@ PresentationPosition GetPresentationPosition();
 
 bool is_opus_supported();
 
+bool is_aptx_adaptive_offload_enabled();
+
 }  // namespace a2dp
 }  // namespace audio
 }  // namespace bluetooth

@@ -46,35 +46,25 @@
 #include <bluetooth/log.h>
 #include <string.h>
 
+#include <cstdint>
+#include <mutex>
+#include <sstream>
+#include <string>
+
+#include "hardware/bt_av.h"
+#include "internal_include/bt_target.h"
+#include "internal_include/bt_trace.h"
+#include "osi/include/osi.h"
+#include "osi/include/properties.h"
+#include "stack/include/a2dp_api.h"
+#include "stack/include/a2dp_codec_api.h"
+#include "stack/include/a2dp_constants.h"
 #include "stack/include/a2dp_vendor.h"
 #include "stack/include/a2dp_vendor_aptx_adaptive_encoder.h"
-#include "stack/include/a2dp_codec_api.h"
-#include "bt_target.h"
-#include "internal_include/bt_trace.h"
-// #include "bt_utils.h"
-#include "hardware/bt_av.h"
-#include "osi/include/osi.h"
+#include "stack/include/avdt_api.h"
+#include "stack/include/bt_hdr.h"
 
 using namespace bluetooth;
-
-/* aptX-adaptive Source codec capabilities */
-static const tA2DP_APTX_ADAPTIVE_CIE a2dp_aptx_adaptive_src_caps = {
-        A2DP_APTX_ADAPTIVE_VENDOR_ID,                                              /* vendorId */
-        A2DP_APTX_ADAPTIVE_CODEC_ID_BLUETOOTH,                                     /* codecId */
-        A2DP_APTX_ADAPTIVE_SAMPLERATE_48000 | A2DP_APTX_ADAPTIVE_SAMPLERATE_96000, /* sampleRate */
-        A2DP_APTX_ADAPTIVE_SOURCE_TYPE_2,
-        (A2DP_APTX_ADAPTIVE_CHANNELS_JOINT_STEREO | A2DP_APTX_ADAPTIVE_CHANNELS_STEREO |
-         A2DP_APTX_ADAPTIVE_CHANNELS_TWS_STEREO | A2DP_APTX_ADAPTIVE_CHANNELS_TWS_MONO |
-         A2DP_APTX_ADAPTIVE_CHANNELS_TWS_PLUS),
-        {A2DP_APTX_ADAPTIVE_TTP_LL_0, A2DP_APTX_ADAPTIVE_TTP_LL_1, A2DP_APTX_ADAPTIVE_TTP_HQ_0,
-         A2DP_APTX_ADAPTIVE_TTP_HQ_1, A2DP_APTX_ADAPTIVE_TTP_TWS_0, A2DP_APTX_ADAPTIVE_TTP_TWS_1,
-         A2DP_APTX_ADAPTIVE_RESERVED_15THBYTE, A2DP_APTX_ADAPTIVE_CAP_EXT_VER_NUM,
-         A2DP_APTX_ADAPTIVE_SUPPORTED_FEATURES, A2DP_APTX_ADAPTIVE_FIRST_SETUP_PREF,
-         A2DP_APTX_ADAPTIVE_SECOND_SETUP_PREF, A2DP_APTX_ADAPTIVE_THIRD_SETUP_PREF,
-         A2DP_APTX_ADAPTIVE_FOURTH_SETUP_PREF, A2DP_APTX_ADAPTIVE_EOC0, A2DP_APTX_ADAPTIVE_EOC1},
-
-        BTAV_A2DP_CODEC_BITS_PER_SAMPLE_24, /* bits_per_sample */
-        {0}};
 
 /* Default aptX-adaptive codec configuration */
 static const tA2DP_APTX_ADAPTIVE_CIE a2dp_aptx_adaptive_offload_caps = {
@@ -128,23 +118,6 @@ static const tA2DP_APTX_ADAPTIVE_CIE a2dp_aptx_adaptive_r2_2_offload_caps = {
          A2DP_APTX_ADAPTIVE_TTP_HQ_1, A2DP_APTX_ADAPTIVE_TTP_TWS_0, A2DP_APTX_ADAPTIVE_TTP_TWS_1,
          A2DP_APTX_ADAPTIVE_RESERVED_15THBYTE, A2DP_APTX_ADAPTIVE_CAP_EXT_VER_NUM,
          A2DP_APTX_ADAPTIVE_R2_2_SUPPORTED_FEATURES, A2DP_APTX_ADAPTIVE_FIRST_SETUP_PREF,
-         A2DP_APTX_ADAPTIVE_SECOND_SETUP_PREF, A2DP_APTX_ADAPTIVE_THIRD_SETUP_PREF,
-         A2DP_APTX_ADAPTIVE_FOURTH_SETUP_PREF, A2DP_APTX_ADAPTIVE_EOC0, A2DP_APTX_ADAPTIVE_EOC1},
-
-        BTAV_A2DP_CODEC_BITS_PER_SAMPLE_24, /* bits_per_sample */
-        {0}};
-
-/* Default aptX-adaptive codec configuration */
-static const tA2DP_APTX_ADAPTIVE_CIE a2dp_aptx_adaptive_default_src_config = {
-        A2DP_APTX_ADAPTIVE_VENDOR_ID,          /* vendorId */
-        A2DP_APTX_ADAPTIVE_CODEC_ID_BLUETOOTH, /* codecId */
-        A2DP_APTX_ADAPTIVE_SAMPLERATE_48000,   /* sampleRate */
-        A2DP_APTX_ADAPTIVE_SOURCE_TYPE_2,
-        A2DP_APTX_ADAPTIVE_CHANNELS_STEREO | A2DP_APTX_ADAPTIVE_CHANNELS_TWS_PLUS, /* channelMode */
-        {A2DP_APTX_ADAPTIVE_TTP_LL_0, A2DP_APTX_ADAPTIVE_TTP_LL_1, A2DP_APTX_ADAPTIVE_TTP_HQ_0,
-         A2DP_APTX_ADAPTIVE_TTP_HQ_1, A2DP_APTX_ADAPTIVE_TTP_TWS_0, A2DP_APTX_ADAPTIVE_TTP_TWS_1,
-         A2DP_APTX_ADAPTIVE_RESERVED_15THBYTE, A2DP_APTX_ADAPTIVE_CAP_EXT_VER_NUM,
-         A2DP_APTX_ADAPTIVE_SUPPORTED_FEATURES, A2DP_APTX_ADAPTIVE_FIRST_SETUP_PREF,
          A2DP_APTX_ADAPTIVE_SECOND_SETUP_PREF, A2DP_APTX_ADAPTIVE_THIRD_SETUP_PREF,
          A2DP_APTX_ADAPTIVE_FOURTH_SETUP_PREF, A2DP_APTX_ADAPTIVE_EOC0, A2DP_APTX_ADAPTIVE_EOC1},
 
@@ -433,7 +406,7 @@ bool A2DP_VendorUsesRtpHeaderAptxAdaptive(UNUSED_ATTR bool content_protection_en
 }
 
 const char* A2DP_VendorCodecNameAptxAdaptive(UNUSED_ATTR const uint8_t* p_codec_info) {
-  return "aptX-adaptive";
+  return "aptX Adaptive";
 }
 
 bool A2DP_VendorCodecTypeEqualsAptxAdaptive(const uint8_t* p_codec_info_a,
@@ -621,11 +594,11 @@ tA2DP_STATUS A2DP_VendorIsCodecConfigMatchAptxAdaptive(const uint8_t* p_codec_in
   return a2dp_status;
 }
 
-btav_a2dp_codec_index_t A2DP_VendorSourceCodecIndexAptxAdaptive(const uint8_t* p_codec_info) {
+btav_a2dp_codec_index_t A2DP_VendorSourceCodecIndexAptxAdaptive(const uint8_t* /* p_codec_info */) {
   return BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE;
 }
 
-const char* A2DP_VendorCodecIndexStrAptxAdaptive(void) { return "aptX-adaptive"; }
+const char* A2DP_VendorCodecIndexStrAptxAdaptive(void) { return "aptX Adaptive"; }
 
 bool A2DP_VendorInitCodecConfigAptxAdaptive(AvdtpSepConfig* p_cfg) {
   /*if (!A2DP_IsCodecEnabled(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE)) {
@@ -650,41 +623,43 @@ bool A2DP_VendorInitCodecConfigAptxAdaptive(AvdtpSepConfig* p_cfg) {
   return true;
 }
 
+static bool A2DP_Get_Aptx_AdaptiveR2_1_Supported() {
+  return osi_property_get_bool("persist.vendor.qcom.bluetooth.aptxadaptiver2_1_support", true);
+}
+
+static bool A2DP_Get_Aptx_AdaptiveR2_2_Supported() { return false; }
+
+static bool A2DP_Get_Source_Aptx_Adaptive_SplitTx_Supported() { return false; }
+
 A2dpCodecConfigAptxAdaptive::A2dpCodecConfigAptxAdaptive(btav_a2dp_codec_priority_t codec_priority)
-    : A2dpCodecConfig(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE, bluetooth::a2dp::CodecId::APTX_AD,
-                      "aptX-adaptive", codec_priority) {
+    : A2dpCodecConfig(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE,
+                      bluetooth::a2dp::CodecId::APTX_ADAPTIVE, "aptX Adaptive", codec_priority) {
   // Compute the local capability
   log::info("A2dpCodecConfigAptxAdaptive");
-  if (A2DP_IsCodecEnabledInOffload(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE)) {
-    log::debug("BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE");
-    if (A2DP_Get_Aptx_AdaptiveR2_2_Supported()) {
-      log::debug("A2DP_Get_Aptx_AdaptiveR2_2_Supported");
-      a2dp_aptx_adaptive_caps = a2dp_aptx_adaptive_r2_2_offload_caps;
-      a2dp_aptx_adaptive_default_config = a2dp_aptx_adaptive_r2_2_default_offload_config;
-    } else if (A2DP_Get_Aptx_AdaptiveR2_1_Supported()) {
-      log::debug("A2DP_Get_Aptx_AdaptiveR2_1_Supported");
-      a2dp_aptx_adaptive_caps = a2dp_aptx_adaptive_r2_1_offload_caps;
-      a2dp_aptx_adaptive_default_config = a2dp_aptx_adaptive_r2_1_default_offload_config;
-      if (A2DP_Get_Source_Aptx_Adaptive_SplitTx_Supported()) {
-        log::debug("A2DP_Get_Source_Aptx_Adaptive_SplitTx_Supported");
-        a2dp_aptx_adaptive_caps.aptx_data.aptx_adaptive_sup_features |=
-                A2DP_APTX_ADAPTIVE_SOURCE_SPILT_TX_SUPPORTED;
-        a2dp_aptx_adaptive_default_config.aptx_data.aptx_adaptive_sup_features |=
-                A2DP_APTX_ADAPTIVE_SOURCE_SPILT_TX_SUPPORTED;
-      }
-    } else {
-      if (/*getOffloadCaps().find("aptxadaptiver2") == std::string::npos*/ false) {
-        a2dp_aptx_adaptive_caps = a2dp_aptx_adaptive_r1_offload_caps;
-        a2dp_aptx_adaptive_default_config = a2dp_aptx_adaptive_r1_default_offload_config;
-      } else {
-        a2dp_aptx_adaptive_caps = a2dp_aptx_adaptive_offload_caps;
-        a2dp_aptx_adaptive_default_config = a2dp_aptx_adaptive_default_offload_config;
-      }
+  log::debug("BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE");
+  if (A2DP_Get_Aptx_AdaptiveR2_2_Supported()) {
+    log::debug("A2DP_Get_Aptx_AdaptiveR2_2_Supported");
+    a2dp_aptx_adaptive_caps = a2dp_aptx_adaptive_r2_2_offload_caps;
+    a2dp_aptx_adaptive_default_config = a2dp_aptx_adaptive_r2_2_default_offload_config;
+  } else if (A2DP_Get_Aptx_AdaptiveR2_1_Supported()) {
+    log::info("A2DP_Get_Aptx_AdaptiveR2_1_Supported");
+    a2dp_aptx_adaptive_caps = a2dp_aptx_adaptive_r2_1_offload_caps;
+    a2dp_aptx_adaptive_default_config = a2dp_aptx_adaptive_r2_1_default_offload_config;
+    if (A2DP_Get_Source_Aptx_Adaptive_SplitTx_Supported()) {
+      log::debug("A2DP_Get_Source_Aptx_Adaptive_SplitTx_Supported");
+      a2dp_aptx_adaptive_caps.aptx_data.aptx_adaptive_sup_features |=
+              A2DP_APTX_ADAPTIVE_SOURCE_SPILT_TX_SUPPORTED;
+      a2dp_aptx_adaptive_default_config.aptx_data.aptx_adaptive_sup_features |=
+              A2DP_APTX_ADAPTIVE_SOURCE_SPILT_TX_SUPPORTED;
     }
   } else {
-    log::debug("Codec is not APTX_ADAPTIVE");
-    a2dp_aptx_adaptive_caps = a2dp_aptx_adaptive_src_caps;
-    a2dp_aptx_adaptive_default_config = a2dp_aptx_adaptive_default_src_config;
+    if (/*getOffloadCaps().find("aptxadaptiver2") == std::string::npos*/ false) {
+      a2dp_aptx_adaptive_caps = a2dp_aptx_adaptive_r1_offload_caps;
+      a2dp_aptx_adaptive_default_config = a2dp_aptx_adaptive_r1_default_offload_config;
+    } else {
+      a2dp_aptx_adaptive_caps = a2dp_aptx_adaptive_offload_caps;
+      a2dp_aptx_adaptive_default_config = a2dp_aptx_adaptive_default_offload_config;
+    }
   }
   if (a2dp_aptx_adaptive_caps.sampleRate & A2DP_APTX_ADAPTIVE_SAMPLERATE_44100) {
     codec_local_capability_.sample_rate |= BTAV_A2DP_CODEC_SAMPLE_RATE_44100;
@@ -717,23 +692,7 @@ A2dpCodecConfigAptxAdaptive::A2dpCodecConfigAptxAdaptive(btav_a2dp_codec_priorit
 
 A2dpCodecConfigAptxAdaptive::~A2dpCodecConfigAptxAdaptive() {}
 
-bool A2dpCodecConfigAptxAdaptive::init() {
-  if (true /*A2DP_IsCodecEnabledInOffload(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE)*/) {
-    return true;
-  } /*else if(!A2DP_IsCodecEnabledInSoftware(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE)){
-    LOG_DEBUG(LOG_TAG, "%s: APTX-Adaptive disabled in both SW and HW mode", __func__);
-    return false;
-  } else {
-    LOG_DEBUG(LOG_TAG, "%s: APTX-Adaptive enabled in SW mode", __func__);
-  }*/
-
-  // Load the encoder
-  if (!A2DP_VendorLoadEncoderAptxAdaptive()) {
-    return false;
-  }
-
-  return true;
-}
+bool A2dpCodecConfigAptxAdaptive::init() { return A2DP_VendorLoadEncoderAptxAdaptive(); }
 
 bool A2dpCodecConfigAptxAdaptive::useRtpHeaderMarkerBit() const { return false; }
 
@@ -825,11 +784,7 @@ static bool select_audio_bits_per_sample(const btav_a2dp_codec_config_t* p_codec
       p_codec_config->bits_per_sample = BTAV_A2DP_CODEC_BITS_PER_SAMPLE_24;
       return true;
     case BTAV_A2DP_CODEC_BITS_PER_SAMPLE_32:
-      p_codec_config->bits_per_sample = BTAV_A2DP_CODEC_BITS_PER_SAMPLE_32;
-      return true;
     case BTAV_A2DP_CODEC_BITS_PER_SAMPLE_16:
-      p_codec_config->bits_per_sample = BTAV_A2DP_CODEC_BITS_PER_SAMPLE_16;
-      return true;
     case BTAV_A2DP_CODEC_BITS_PER_SAMPLE_NONE:
       break;
   }
@@ -1303,9 +1258,10 @@ tA2DP_STATUS A2dpCodecConfigAptxAdaptive::setCodecConfig(const uint8_t* p_peer_c
     status = A2DP_BuildInfoAptxAdaptive(AVDT_MEDIA_TYPE_AUDIO, &sink_info_cie,
                                         ota_codec_peer_config_.data());
   }
-  CHECK(status == A2DP_SUCCESS);
-  status = A2DP_BuildInfoAptxAdaptive(AVDT_MEDIA_TYPE_AUDIO, &result_config_cie, ota_codec_config_.data());
-  CHECK(status == A2DP_SUCCESS);
+  log::assert_that(status == A2DP_SUCCESS, "Failed to build media codec capabilities");
+  status = A2DP_BuildInfoAptxAdaptive(AVDT_MEDIA_TYPE_AUDIO, &result_config_cie,
+                                      ota_codec_config_.data());
+  log::assert_that(status == A2DP_SUCCESS, "Failed to build media codec capabilities");
   return A2DP_SUCCESS;
 
 fail:
@@ -1371,7 +1327,7 @@ bool A2dpCodecConfigAptxAdaptive::setPeerCodecCapabilities(const uint8_t* p_peer
 
   status = A2DP_BuildInfoAptxAdaptive(AVDT_MEDIA_TYPE_AUDIO, &sink_info_cie,
                                       ota_codec_peer_capability_.data());
-  CHECK(status == A2DP_SUCCESS);
+  log::assert_that(status == A2DP_SUCCESS, "Failed to build media codec capabilities");
   return true;
 
 fail:

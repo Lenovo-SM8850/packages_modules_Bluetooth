@@ -343,6 +343,8 @@ void flush_source() {}
 // Check if OPUS codec is supported
 bool is_opus_supported() { return true; }
 
+bool is_aptx_adaptive_offload_enabled() { return false; }
+
 namespace provider {
 
 // Lookup the codec info in the list of supported offloaded sink codecs.

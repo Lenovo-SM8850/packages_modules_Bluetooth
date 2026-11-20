@@ -27,6 +27,7 @@
 #include "stack/include/a2dp_codec_api.h"
 #include "stack/include/a2dp_sbc.h"
 #include "stack/include/a2dp_vendor.h"
+#include "stack/include/a2dp_vendor_aptx_adaptive.h"
 #include "stack/include/a2dp_vendor_opus_constants.h"
 #include "stack/include/bt_hdr.h"
 
@@ -265,6 +266,9 @@ protected:
           break;
         case BTAV_A2DP_CODEC_INDEX_SOURCE_LHDCV5:
         case BTAV_A2DP_CODEC_INDEX_SOURCE_LHDCV3:
+          supported = true;
+          break;
+        case BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE:
           supported = true;
           break;
         case BTAV_A2DP_CODEC_INDEX_SINK_SBC:
@@ -801,6 +805,7 @@ TEST_F(StackA2dpTest, test_a2dp_codec_index_str) {
   EXPECT_STREQ(A2DP_CodecIndexStr(BTAV_A2DP_CODEC_INDEX_SOURCE_AAC), "AAC");
   EXPECT_STREQ(A2DP_CodecIndexStr(BTAV_A2DP_CODEC_INDEX_SOURCE_OPUS), "Opus");
   EXPECT_STREQ(A2DP_CodecIndexStr(BTAV_A2DP_CODEC_INDEX_SINK_OPUS), "Opus SINK");
+  EXPECT_STREQ(A2DP_CodecIndexStr(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE), "aptX Adaptive");
 
   // Test that the unknown codec string has not changed
   EXPECT_STREQ(A2DP_CodecIndexStr(BTAV_A2DP_CODEC_INDEX_MAX), "UNKNOWN CODEC INDEX");
@@ -1058,4 +1063,49 @@ TEST_F(A2dpCodecConfigTest, init) {
 
   const std::list<A2dpCodecConfig*> orderedSinkCodecs = codecs.orderedSinkCodecs();
   EXPECT_FALSE(orderedSinkCodecs.empty());
+}
+
+TEST_F(A2dpCodecConfigTest, aptx_adaptive_local_capability) {
+  const uint8_t expected[AVDT_CODEC_SIZE] = {
+          0x2a, 0x00, 0xff, 0xd7, 0x00, 0x00, 0x00, 0xad, 0x00, 0xb0, 0x3e,
+          0x50, 0x64, 0x64, 0x64, 0xff, 0xff, 0x00, 0x01, 0x03, 0x00, 0x00,
+          0x0f, 0x02, 0x03, 0x03, 0x03, 0x00, 0xaa};
+
+  // The constructor fills the file-static capability, so create the codec first.
+  A2dpCodecConfig* codec_config =
+          A2dpCodecConfig::createCodec(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE);
+  ASSERT_NE(codec_config, nullptr);
+
+  AvdtpSepConfig avdt_cfg;
+  memset(&avdt_cfg, 0, sizeof(avdt_cfg));
+  ASSERT_TRUE(A2DP_InitCodecConfig(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE, &avdt_cfg));
+  for (size_t i = 0; i < 43; i++) {
+    EXPECT_EQ(avdt_cfg.codec_info[i], expected[i]) << "byte " << i;
+  }
+  delete codec_config;
+}
+
+TEST_F(A2dpCodecConfigTest, aptx_adaptive_set_codec_config) {
+  const uint8_t sink_capability[AVDT_CODEC_SIZE] = {
+          0x2a, 0x00, 0xff, 0xd7, 0x00, 0x00, 0x00, 0xad, 0x00, 0xb0, 0x02,
+          0x50, 0x64, 0x64, 0x64, 0xff, 0xff, 0x00, 0x01, 0x03, 0x00, 0x00,
+          0x0f, 0x02, 0x03, 0x03, 0x03, 0x00, 0xaa};
+  uint8_t codec_info_result[AVDT_CODEC_SIZE];
+  memset(codec_info_result, 0, sizeof(codec_info_result));
+
+  // A2dpCodecs::init() only creates this codec when the audio HAL reports an
+  // offload path, which this test binary does not provide, so use the codec
+  // object directly.
+  A2dpCodecConfigAptxAdaptive codec_config(BTAV_A2DP_CODEC_PRIORITY_DEFAULT);
+
+  ASSERT_EQ(A2DP_SourceCodecIndex(sink_capability), BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE);
+  ASSERT_EQ(codec_config.setCodecConfig(sink_capability, true /* is_capability */,
+                                        codec_info_result),
+            A2DP_SUCCESS);
+  EXPECT_EQ(codec_info_result[9], 0x10);
+  EXPECT_EQ(codec_info_result[10], 0x02);
+  EXPECT_EQ(codec_info_result[27], 0x00);
+  EXPECT_EQ(codec_info_result[28], 0xaa);
+  EXPECT_EQ(A2DP_GetTrackSampleRate(codec_info_result), 48000);
+  EXPECT_EQ(A2DP_SourceCodecIndex(codec_info_result), BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE);
 }

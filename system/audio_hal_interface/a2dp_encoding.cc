@@ -196,6 +196,8 @@ bool is_opus_supported() {
   return false;
 }
 
+bool is_aptx_adaptive_offload_enabled() { return false; }
+
 namespace provider {
 
 // Lookup the codec info in the list of supported offloaded sink codecs.

@@ -133,6 +133,9 @@ void set_remote_delay(uint16_t delay_report);
 // Check whether OPUS is supported
 bool is_opus_supported();
 
+// True when the audio HAL offloads aptX Adaptive for the current controller.
+bool is_aptx_adaptive_offload_enabled();
+
 // Definitions for A2DP hardware offload codec extensibility.
 namespace provider {
 

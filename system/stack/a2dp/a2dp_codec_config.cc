@@ -50,6 +50,7 @@
 
 #if !defined(EXCLUDE_NONSTANDARD_CODECS)
 #include "stack/include/a2dp_vendor_aptx.h"
+#include "stack/include/a2dp_vendor_aptx_adaptive.h"
 #include "stack/include/a2dp_vendor_aptx_hd.h"
 #include "stack/include/a2dp_vendor_ldac.h"
 #include "stack/include/a2dp_vendor_lhdcv3.h"
@@ -115,6 +116,8 @@ std::string CodecIdToString(CodecId codec_id) {
       return "LDAC";
     case CodecId::OPUS:
       return "OPUS";
+    case CodecId::APTX_ADAPTIVE:
+      return "APTX_ADAPTIVE";
     default:
       if (static_cast<uint8_t>(codec_id) == A2DP_MEDIA_CT_NON_A2DP) {
         return std::format("Codec ID: 0x{:04x}, Vendor ID: 0x{:04x}",
@@ -225,6 +228,9 @@ A2dpCodecConfig* A2dpCodecConfig::createCodec(btav_a2dp_codec_index_t codec_inde
       break;
     case BTAV_A2DP_CODEC_INDEX_SOURCE_LHDCV3:
       codec_config = new A2dpCodecConfigLhdcV3Source(codec_priority);
+      break;
+    case BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE:
+      codec_config = new A2dpCodecConfigAptxAdaptive(codec_priority);
       break;
 #endif
     case BTAV_A2DP_CODEC_INDEX_MAX:
@@ -604,6 +610,9 @@ int A2DP_IotGetPeerSinkCodecType(const uint8_t* p_codec_info) {
         peer_codec_type = IOT_CONF_VAL_A2DP_CODECTYPE_APTXHD;
       } else if (codec_id == A2DP_LDAC_CODEC_ID && vendor_id == A2DP_LDAC_VENDOR_ID) {
         peer_codec_type = IOT_CONF_VAL_A2DP_CODECTYPE_LDAC;
+      } else if (codec_id == A2DP_APTX_ADAPTIVE_CODEC_ID_BLUETOOTH &&
+                 vendor_id == A2DP_APTX_ADAPTIVE_VENDOR_ID) {
+        peer_codec_type = IOT_CONF_VAL_A2DP_CODECTYPE_APTXADAPTIVE;
       }
       break;
     }
@@ -688,6 +697,19 @@ bool A2dpCodecs::init() {
          codec_index == BTAV_A2DP_CODEC_INDEX_SOURCE_LHDCV3)) {
       codec_priority = BTAV_A2DP_CODEC_PRIORITY_DISABLED;
       log::info("LHDCv5 codec disabled");
+    }
+
+    if (codec_index == BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE) {
+#if !defined(UNIT_TESTS)
+      // Hardware encoding only: without an offload path the codec does not exist.
+      if (!bluetooth::audio::a2dp::is_aptx_adaptive_offload_enabled()) {
+        continue;
+      }
+#endif
+      if (cp_iter == codec_priorities_.end()) {
+        codec_priority = static_cast<btav_a2dp_codec_priority_t>(osi_property_get_int32(
+                "bluetooth.a2dp.source.aptx_adaptive_priority.config", 6001));
+      }
     }
 
     A2dpCodecConfig* codec_config = A2dpCodecConfig::createCodec(codec_index, codec_priority);
@@ -1223,6 +1245,8 @@ const char* A2DP_CodecName(const uint8_t* p_codec_info) {
       return "LHDCv5";
     case CodecId::LHDCV3:
       return "LHDC V3";
+    case CodecId::APTX_ADAPTIVE:
+      return "aptX Adaptive";
     default:
       return "(unknown codec)";
   }
@@ -1279,6 +1303,8 @@ bool A2DP_CodecEquals(const uint8_t* p_codec_info_a, const uint8_t* p_codec_info
       return A2DP_VendorCodecEqualsLhdcV5(p_codec_info_a, p_codec_info_b);
     case bluetooth::a2dp::CodecId::LHDCV3:
       return A2DP_VendorCodecEqualsLhdcV3(p_codec_info_a, p_codec_info_b);
+    case bluetooth::a2dp::CodecId::APTX_ADAPTIVE:
+      return A2DP_VendorCodecEqualsAptxAdaptive(p_codec_info_a, p_codec_info_b);
 #endif
     default:
       break;
@@ -1313,6 +1339,8 @@ int A2DP_GetTrackSampleRate(const uint8_t* p_codec_info) {
       return A2DP_VendorGetTrackSampleRateLhdcV5(p_codec_info);
     case bluetooth::a2dp::CodecId::LHDCV3:
       return A2DP_VendorGetTrackSampleRateLhdcV3(p_codec_info);
+    case bluetooth::a2dp::CodecId::APTX_ADAPTIVE:
+      return A2DP_VendorGetTrackSampleRateAptxAdaptive(p_codec_info);
 #endif
     default:
       break;
@@ -1347,6 +1375,8 @@ int A2DP_GetTrackBitsPerSample(const uint8_t* p_codec_info) {
       return A2DP_VendorGetTrackBitsPerSampleLhdcV5(p_codec_info);
     case bluetooth::a2dp::CodecId::LHDCV3:
       return A2DP_VendorGetTrackBitsPerSampleLhdcV3(p_codec_info);
+    case bluetooth::a2dp::CodecId::APTX_ADAPTIVE:
+      return A2DP_VendorGetTrackBitsPerSampleAptxAdaptive(p_codec_info);
 #endif
     default:
       break;
@@ -1381,6 +1411,8 @@ int A2DP_GetTrackChannelCount(const uint8_t* p_codec_info) {
       return A2DP_VendorGetTrackChannelCountLhdcV5(p_codec_info);
     case bluetooth::a2dp::CodecId::LHDCV3:
       return A2DP_VendorGetTrackChannelCountLhdcV3(p_codec_info);
+    case bluetooth::a2dp::CodecId::APTX_ADAPTIVE:
+      return A2DP_VendorGetTrackChannelCountAptxAdaptive(p_codec_info);
 #endif
     default:
       break;
@@ -1436,6 +1468,8 @@ bool A2DP_GetPacketTimestamp(const uint8_t* p_codec_info, const uint8_t* p_data,
       return A2DP_VendorGetPacketTimestampLhdcV5(p_codec_info, p_data, p_timestamp);
     case bluetooth::a2dp::CodecId::LHDCV3:
       return A2DP_VendorGetPacketTimestampLhdcV3(p_codec_info, p_data, p_timestamp);
+    case bluetooth::a2dp::CodecId::APTX_ADAPTIVE:
+      return A2DP_VendorGetPacketTimestampAptxAdaptive(p_codec_info, p_data, p_timestamp);
 #endif
     default:
       break;
@@ -1615,6 +1649,8 @@ const char* A2DP_CodecIndexStr(btav_a2dp_codec_index_t codec_index) {
       return "LHDCv5";
     case BTAV_A2DP_CODEC_INDEX_SOURCE_LHDCV3:
       return "LHDC V3";
+    case BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE:
+      return "aptX Adaptive";
     case BTAV_A2DP_CODEC_INDEX_SOURCE_EXT_MIN:
     case BTAV_A2DP_CODEC_INDEX_SINK_EXT_MIN:
     case BTAV_A2DP_CODEC_INDEX_MAX:

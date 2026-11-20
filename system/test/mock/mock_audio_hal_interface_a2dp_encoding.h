@@ -197,6 +197,16 @@ struct is_opus_supported {
 };
 extern struct is_opus_supported is_opus_supported;
 
+// Name: is_aptx_adaptive_offload_enabled
+// Params:
+// Return: bool
+struct is_aptx_adaptive_offload_enabled {
+  static bool return_value;
+  std::function<bool()> body{[]() { return return_value; }};
+  bool operator()() { return body(); }
+};
+extern struct is_aptx_adaptive_offload_enabled is_aptx_adaptive_offload_enabled;
+
 // Name: parse_a2dp_configuration
 // Params: ::bluetooth::a2dp::CodecId codec_id, const uint8_t* codec_info,
 // btav_a2dp_codec_config_t* codec_parameters, std::vector<uint8_t>*

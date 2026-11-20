@@ -39,10 +39,16 @@
 #ifndef A2DP_VENDOR_APTX_ADAPTIVE_H
 #define A2DP_VENDOR_APTX_ADAPTIVE_H
 
-#include "stack/include/a2dp_codec_api.h"
-#include "stack/include/a2dp_vendor_aptx_adaptive_constants.h"
-#include "avdt_api.h"
+#include <cstddef>
+#include <cstdint>
+#include <string>
+
 #include "internal_include/bt_target.h"
+#include "stack/include/a2dp_codec_api.h"
+#include "stack/include/a2dp_constants.h"
+#include "stack/include/a2dp_vendor_aptx_adaptive_constants.h"
+#include "stack/include/avdt_api.h"
+#include "stack/include/bt_hdr.h"
 
 class A2dpCodecConfigAptxAdaptive : public A2dpCodecConfig {
 public:
@@ -57,8 +63,6 @@ public:
 
 private:
   bool useRtpHeaderMarkerBit() const override;
-
-  btav_a2dp_codec_config_t previous_codec_config;
 
   void debug_codec_dump(int fd) override;
 };
@@ -84,6 +88,8 @@ typedef struct {
   uint8_t eoc0;                         // no further expansion
   uint8_t eoc1;                         // capability extension end
 } tA2DP_APTX_ADAPTIVE_VENDOR_DATA;
+static_assert(offsetof(tA2DP_APTX_ADAPTIVE_VENDOR_DATA, eoc1) == 17 &&
+              offsetof(tA2DP_APTX_ADAPTIVE_VENDOR_DATA, aptx_adaptive_sup_features) == 8);
 // This is due to be updated
 typedef struct {
   uint32_t vendorId;

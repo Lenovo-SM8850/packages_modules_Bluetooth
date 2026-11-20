@@ -75,98 +75,28 @@ typedef struct {
 
 static tA2DP_APTX_ADAPTIVE_ENCODER_CB a2dp_aptx_adaptive_encoder_cb;
 
-bool A2DP_VendorLoadEncoderAptxAdaptive(void) {
-  if (true /*A2DP_IsCodecEnabledInOffload(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE)*/) {
-    return true;
-  }
+bool A2DP_VendorLoadEncoderAptxAdaptive(void) { return true; }
 
-  return true;
-}
+void A2DP_VendorUnloadEncoderAptxAdaptive(void) {}
 
-void A2DP_VendorUnloadEncoderAptxAdaptive(void) {
-  if (true /*A2DP_IsCodecEnabledInOffload(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE)*/) {
-    return;
-  }
-}
+void a2dp_vendor_aptx_adaptive_encoder_init(const tA2DP_ENCODER_INIT_PEER_PARAMS* /* p_peer_params */,
+                                            A2dpCodecConfig* /* a2dp_codec_config */,
+                                            a2dp_source_read_callback_t /* read_callback */,
+                                            a2dp_source_enqueue_callback_t /* enqueue_callback */) {}
 
-void a2dp_vendor_aptx_adaptive_encoder_init(const tA2DP_ENCODER_INIT_PEER_PARAMS* p_peer_params,
-                                            A2dpCodecConfig* a2dp_codec_config,
-                                            a2dp_source_read_callback_t read_callback,
-                                            a2dp_source_enqueue_callback_t enqueue_callback) {
-  if (true /*A2DP_IsCodecEnabledInOffload(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE)*/) {
-    return;
-  }
-}
+void a2dp_vendor_aptx_adaptive_feeding_reset(void) {}
 
-/*bool A2dpCodecConfigAptxAdaptive::updateEncoderUserConfig(
-    const tA2DP_ENCODER_INIT_PEER_PARAMS* p_peer_params, bool* p_restart_input,
-    bool* p_restart_output, bool* p_config_updated) {
-
-  btav_a2dp_codec_config_t codec_config = getCodecConfig();
-
-  a2dp_aptx_adaptive_encoder_cb.is_peer_edr = p_peer_params->is_peer_edr;
-  a2dp_aptx_adaptive_encoder_cb.peer_supports_3mbps =
-      p_peer_params->peer_supports_3mbps;
-  a2dp_aptx_adaptive_encoder_cb.peer_mtu = p_peer_params->peer_mtu;
-
-  if (a2dp_aptx_adaptive_encoder_cb.peer_mtu == 0) {
-    LOG_ERROR(LOG_TAG,
-              "%s: Cannot update the codec encoder for %s: "
-              "invalid peer MTU",
-              __func__, name().c_str());
-    return false;
-  }
-
-
-  if (!isCodecConfigEmpty(previous_codec_config)) {
-     if (previous_codec_config.codec_priority == codec_config.codec_priority &&
-         previous_codec_config.sample_rate == codec_config.sample_rate &&
-         previous_codec_config.bits_per_sample == codec_config.bits_per_sample &&
-         previous_codec_config.channel_mode == codec_config.channel_mode) {
-
-       if (previous_codec_config.codec_specific_4 != codec_config.codec_specific_4 ) {
-         // this is just our private config that has changed, no need to send
-         // a BTIF_AV_SOURCE_CONFIG_UPDATED_EVT, which restarts split audio
-         *p_config_updated = false;
-       }
-     }
-  }
-
-  previous_codec_config = codec_config;
-
-  return true;
-}*/
-
-void a2dp_vendor_aptx_adaptive_feeding_reset(void) {
-  if (true /*A2DP_IsCodecEnabledInOffload(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE)*/) {
-    return;
-  }
-}
-
-void a2dp_vendor_aptx_adaptive_feeding_flush(void) {
-  if (true /*A2DP_IsCodecEnabledInOffload(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE)*/) {
-    return;
-  }
-}
+void a2dp_vendor_aptx_adaptive_feeding_flush(void) {}
 
 uint64_t a2dp_vendor_aptx_adaptive_get_encoder_interval_ms(void) { return 0; }
 
 int a2dp_vendor_aptx_adaptive_get_effective_frame_size() { return 0; }
 
-void a2dp_vendor_aptx_adaptive_send_frames(uint64_t timestamp_us) {
-  if (true /*A2DP_IsCodecEnabledInOffload(BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE)*/) {
-    return;
-  }
-}
+void a2dp_vendor_aptx_adaptive_send_frames(uint64_t /* timestamp_us */) {}
 
 void a2dp_vendor_aptx_adaptive_encoder_cleanup(void) {
-  // osi_free(a2dp_aptx_adaptive_encoder_cb.aptx_adaptive_encoder_state);
   memset(&a2dp_aptx_adaptive_encoder_cb, 0, sizeof(a2dp_aptx_adaptive_encoder_cb));
 }
-
-/*uint64_t A2dpCodecConfigAptxAdaptive::encoderIntervalMs() const {
-  return 0;
-}*/
 
 void A2dpCodecConfigAptxAdaptive::debug_codec_dump(int fd) {
   a2dp_aptx_adaptive_encoder_stats_t* stats = &a2dp_aptx_adaptive_encoder_cb.stats;
@@ -187,8 +117,4 @@ void A2dpCodecConfigAptxAdaptive::debug_codec_dump(int fd) {
           "  PCM read bytes (expected/actual)                        : %zu / "
           "%zu\n",
           stats->media_read_total_expected_read_bytes, stats->media_read_total_actual_read_bytes);
-
-  /*dprintf(fd,
-          "  Connection count                                        : %u\n",
-                  a2dp_aptx_adaptive_encoder_cb.enc_params.connection_count);*/
 }

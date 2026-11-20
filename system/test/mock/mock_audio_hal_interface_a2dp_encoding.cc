@@ -51,6 +51,7 @@ struct init_decoder init_decoder;
 struct is_hal_enabled is_hal_enabled;
 struct is_hal_offloading is_hal_offloading;
 struct is_opus_supported is_opus_supported;
+struct is_aptx_adaptive_offload_enabled is_aptx_adaptive_offload_enabled;
 struct parse_a2dp_configuration parse_a2dp_configuration;
 struct read read;
 struct set_audio_low_latency_mode_allowed set_audio_low_latency_mode_allowed;
@@ -79,6 +80,7 @@ bool init_decoder::return_value = false;
 bool is_hal_enabled::return_value = false;
 bool is_hal_offloading::return_value = false;
 bool is_opus_supported::return_value = false;
+bool is_aptx_adaptive_offload_enabled::return_value = false;
 tA2DP_STATUS parse_a2dp_configuration::return_value = A2DP_SUCCESS;
 size_t read::return_value = 0;
 bool setup_codec::return_value = false;
@@ -151,6 +153,10 @@ bool is_hal_offloading() {
 bool is_opus_supported() {
   inc_func_call_count(__func__);
   return test::mock::audio_hal_interface_a2dp_encoding::is_opus_supported();
+}
+bool is_aptx_adaptive_offload_enabled() {
+  inc_func_call_count(__func__);
+  return test::mock::audio_hal_interface_a2dp_encoding::is_aptx_adaptive_offload_enabled();
 }
 tA2DP_STATUS provider::parse_a2dp_configuration(::bluetooth::a2dp::CodecId codec_id,
                                                 const uint8_t* codec_info,
