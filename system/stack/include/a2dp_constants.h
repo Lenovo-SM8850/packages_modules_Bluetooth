@@ -22,8 +22,9 @@
 #include <cstdint>
 #include <optional>
 
-/* Maximum size in bytes of the codec capabilities information element. */
-#define AVDT_CODEC_SIZE 20
+/* Maximum size in bytes of the codec capabilities information element,
+ * sized for the longest supported vendor codec element. */
+#define AVDT_CODEC_SIZE 45
 
 /* Profile supported features */
 #define A2DP_SUPF_PLAYER 0x0001

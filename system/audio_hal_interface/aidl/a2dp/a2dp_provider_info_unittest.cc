@@ -476,7 +476,7 @@ TEST_F(ProviderInfoTest, TestSupportsCodec) {
 TEST_F(ProviderInfoTest, TestCodecCapabilitiesSbc) {
   GetProviderInfoForTesting(true, false);
 
-  uint8_t result_codec_info[20];
+  uint8_t result_codec_info[AVDT_CODEC_SIZE];
   btav_a2dp_codec_config_t result_codec_config;
   bluetooth::a2dp::CodecId result_codec_id;
 
@@ -497,7 +497,7 @@ TEST_F(ProviderInfoTest, TestCodecCapabilitiesSbc) {
 TEST_F(ProviderInfoTest, TestCodecCapabilitiesAac) {
   GetProviderInfoForTesting(true, false);
 
-  uint8_t result_codec_info[20];
+  uint8_t result_codec_info[AVDT_CODEC_SIZE];
   btav_a2dp_codec_config_t result_codec_config;
   bluetooth::a2dp::CodecId result_codec_id;
 
@@ -518,7 +518,7 @@ TEST_F(ProviderInfoTest, TestCodecCapabilitiesAac) {
 TEST_F(ProviderInfoTest, TestCodecCapabilitiesOpus) {
   GetProviderInfoForTesting(true, false);
 
-  uint8_t result_codec_info[20];
+  uint8_t result_codec_info[AVDT_CODEC_SIZE];
   btav_a2dp_codec_config_t result_codec_config;
   bluetooth::a2dp::CodecId result_codec_id;
 
@@ -540,7 +540,7 @@ TEST_F(ProviderInfoTest, TestCodecCapabilitiesOpus) {
 TEST_F(ProviderInfoTest, TestCodecCapabilitiesFoobar) {
   GetProviderInfoForTesting(true, false);
 
-  uint8_t result_codec_info[20];
+  uint8_t result_codec_info[AVDT_CODEC_SIZE];
   btav_a2dp_codec_config_t result_codec_config;
   bluetooth::a2dp::CodecId result_codec_id;
 

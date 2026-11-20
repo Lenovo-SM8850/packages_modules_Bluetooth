@@ -303,7 +303,7 @@ typedef struct {
 typedef struct {
   ::bluetooth::a2dp::CodecId codec_id;
   std::string name;
-  uint8_t media_codec_capabilites[20];
+  uint8_t media_codec_capabilites[AVDT_CODEC_SIZE];
   btav_a2dp_codec_config_t codec_capabilities;
   bool lossless;
 
