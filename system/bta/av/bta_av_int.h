@@ -641,6 +641,7 @@ typedef struct {
   /* Set to true if the new offload start vendor command
    * was used to start the stream on the controller. */
   bool offload_start_v2;
+  bool offload_start_vsqc; /* the legacy vendor A2DP command started the stream */
   tBTA_AV_FEAT sink_features; /* sink features */
   uint8_t reg_role;           /* bit0-src, bit1-sink */
   tBTA_AV_RC_FEAT rc_feature; /* save peer rc feature */
@@ -652,6 +653,11 @@ constexpr uint8_t kEnablingAttemptsCountMaximum = 5;
 
 /* Vendor OFFLOAD VSC */
 #define HCI_VSQC_CONTROLLER_A2DP_OPCODE 0x000A
+#define HCI_QTI_CONTROLLER_A2DP_OPCODE (HCI_VSQC_CONTROLLER_A2DP_OPCODE | HCI_GRP_VENDOR_SPECIFIC)
+
+/* Sub-opcodes of the legacy vendor A2DP command */
+#define VS_QHCI_A2DP_OFFLOAD_START 0x0A
+#define HCI_VSQC_CONTROLLER_A2DP_STOP_OPCODE 0x05
 
 #define VS_HCI_A2DP_OFFLOAD_START 0x01
 #define VS_HCI_A2DP_OFFLOAD_STOP 0x02

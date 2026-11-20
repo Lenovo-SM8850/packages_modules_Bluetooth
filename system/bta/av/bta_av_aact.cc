@@ -33,6 +33,7 @@
 #include <bluetooth/types/hci_role.h>
 #include <com_android_bluetooth_flags.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
 #include <vector>
@@ -3040,6 +3041,7 @@ static void offload_vendor_callback(tBTM_VSC_CMPL* param) {
           }
         }));
         break;
+      case VS_QHCI_A2DP_OFFLOAD_START:
       case VS_HCI_A2DP_OFFLOAD_START:
       case VS_HCI_A2DP_OFFLOAD_START_V2:
         if (bta_av_cb.offload_start_pending_hndl) {
@@ -3098,6 +3100,7 @@ static void bta_av_vendor_offload_start(tBTA_AV_SCB* p_scb, tBT_A2DP_OFFLOAD* of
   ARRAY_TO_STREAM(p_param, offload_start->codec_info, (int8_t)sizeof(offload_start->codec_info));
   bta_av_cb.offload_start_pending_hndl = p_scb->hndl;
   bta_av_cb.offload_start_v2 = false;
+  bta_av_cb.offload_start_vsqc = false;
   log::info(
           "codec: {:#x}, sample rate: {:#x}, bit depth: {:#x}, channel: {:#x}, "
           "bitrate: {:#x}, ACL: {:#x}, L2CAP: {:#x}, MTU: {:#x}",
@@ -3165,9 +3168,95 @@ static void bta_av_vendor_offload_start_v2(tBTA_AV_SCB* p_scb, A2dpCodecConfigEx
   // Update the pending state.
   bta_av_cb.offload_start_pending_hndl = p_scb->hndl;
   bta_av_cb.offload_start_v2 = true;
+  bta_av_cb.offload_start_vsqc = false;
 
   get_btm_client_interface().vendor.BTM_VendorSpecificCommand(HCI_CONTROLLER_A2DP, p_param - param,
                                                               param, offload_vendor_callback);
+}
+
+static void bta_av_vendor_offload_start_aptx_adaptive(tBTA_AV_SCB* p_scb) {
+  static_assert(AVDT_CODEC_SIZE >= 44, "the start command carries 44 codec information bytes");
+  tBTA_AV bta_av_data = {};
+  uint8_t param[66];
+  uint8_t* p_param = param;
+
+  log::debug("");
+
+  uint16_t mtu = std::min<uint16_t>(p_scb->stream_mtu, MAX_3MBPS_AVDTP_MTU);
+  uint16_t acl_hdl = get_btm_client_interface().peer.BTM_GetHCIConnHandle(p_scb->PeerAddress(),
+                                                                          BT_TRANSPORT_BR_EDR);
+  btav_a2dp_scmst_info_t scmst_info = p_scb->p_cos->get_scmst_info(p_scb->PeerAddress());
+
+  uint16_t sample_rate = 0;
+  int track_sample_rate = A2DP_GetTrackSampleRate(p_scb->cfg.codec_info);
+  switch (track_sample_rate) {
+    case 44100:
+      sample_rate = BTAV_A2DP_CODEC_SAMPLE_RATE_44100;
+      break;
+    case 48000:
+      sample_rate = BTAV_A2DP_CODEC_SAMPLE_RATE_48000;
+      break;
+    case 88200:
+      sample_rate = BTAV_A2DP_CODEC_SAMPLE_RATE_88200;
+      break;
+    case 96000:
+      sample_rate = BTAV_A2DP_CODEC_SAMPLE_RATE_96000;
+      break;
+    default:
+      log::error("Unsupported sample rate {}", track_sample_rate);
+      bta_av_data.status = BTA_AV_FAIL;
+      (*bta_av_cb.p_cback)(BTA_AV_OFFLOAD_START_RSP_EVT, &bta_av_data);
+      return;
+  }
+
+  uint16_t l2c_rcid = 0;
+  if (!stack::l2cap::get_interface().L2CA_GetRemoteChannelId(p_scb->l2c_cid, &l2c_rcid)) {
+    log::error("Failed to fetch l2c rcid");
+    bta_av_data.status = BTA_AV_FAIL;
+    (*bta_av_cb.p_cback)(BTA_AV_OFFLOAD_START_RSP_EVT, &bta_av_data);
+    return;
+  }
+
+  *p_param++ = VS_QHCI_A2DP_OFFLOAD_START;
+  UINT8_TO_STREAM(p_param, 0x0A);  // codec type
+  UINT8_TO_STREAM(p_param, 0);     // transport type slimbus
+  UINT8_TO_STREAM(p_param, 0x0A);  // codec type
+  UINT8_TO_STREAM(p_param, 0);     // dev_index
+  UINT8_TO_STREAM(p_param, 0);     // max latency
+  UINT8_TO_STREAM(p_param, 0);     // delay reporting
+  UINT8_TO_STREAM(p_param, scmst_info.enable_status);
+  UINT8_TO_STREAM(p_param, 2);  // cp_flag
+  UINT16_TO_STREAM(p_param, sample_rate);
+  UINT16_TO_STREAM(p_param, acl_hdl);
+  UINT16_TO_STREAM(p_param, l2c_rcid);
+  UINT16_TO_STREAM(p_param, mtu + AVDT_MEDIA_HDR_SIZE);
+  UINT8_TO_STREAM(p_param, 1);  // Stream Start
+  UINT8_TO_STREAM(p_param, 0);  // tws is false
+  UINT8_TO_STREAM(p_param, 0);  // left for non TWS device
+  UINT16_TO_STREAM(p_param, 150);  // ttp
+  // The codec information element (length octet included), zero padded to 44 bytes.
+  const size_t codec_element_len = std::min<size_t>(p_scb->cfg.codec_info[0] + 1, 44);
+  ARRAY_TO_STREAM(p_param, p_scb->cfg.codec_info, static_cast<int>(codec_element_len));
+  memset(p_param, 0, 44 - codec_element_len);
+  p_param += 44 - codec_element_len;
+  log::assert_that(static_cast<size_t>(p_param - param) == sizeof(param),
+                   "assert failed: aptX Adaptive start command length");
+
+  bta_av_cb.offload_start_pending_hndl = p_scb->hndl;
+  bta_av_cb.offload_start_v2 = false;
+  bta_av_cb.offload_start_vsqc = true;
+  log::info("sample rate: {:#x}, ACL: {:#x}, L2CAP: {:#x}, MTU: {:#x}", sample_rate, acl_hdl,
+            l2c_rcid, mtu + AVDT_MEDIA_HDR_SIZE);
+  get_btm_client_interface().vendor.BTM_VendorSpecificCommand(
+          HCI_QTI_CONTROLLER_A2DP_OPCODE, sizeof(param), param, offload_vendor_callback);
+}
+
+static void offload_vsqc_stop_callback(tBTM_VSC_CMPL* param) {
+  if (param->param_len && param->p_param_buf[0] != 0) {
+    log::warn("Legacy vendor A2DP offload stop failed, status = {}", param->p_param_buf[0]);
+    return;
+  }
+  log::debug("Legacy vendor A2DP offload stop successful");
 }
 
 void bta_av_vendor_offload_stop() {
@@ -3175,6 +3264,14 @@ void bta_av_vendor_offload_stop() {
   uint8_t* p_param = param;
 
   log::debug("");
+
+  if (bta_av_cb.offload_start_vsqc) {
+    *p_param++ = HCI_VSQC_CONTROLLER_A2DP_STOP_OPCODE;
+    *p_param++ = 0;
+    get_btm_client_interface().vendor.BTM_VendorSpecificCommand(
+            HCI_QTI_CONTROLLER_A2DP_OPCODE, p_param - param, param, offload_vsqc_stop_callback);
+    return;
+  }
 
   if (bta_av_cb.offload_start_v2) {
     tBTA_AV_SCB* p_scb = bta_av_hndl_to_scb(bta_av_cb.offload_started_hndl);
@@ -3242,6 +3339,8 @@ void bta_av_offload_req(tBTA_AV_SCB* p_scb, tBTA_AV_DATA* /*p_data*/) {
 
   if (codec_config->isHardwareProviderCodec()) {
     bta_av_vendor_offload_start_v2(p_scb, static_cast<A2dpCodecConfigExt*>(codec_config));
+  } else if (codec_config->codecIndex() == BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE) {
+    bta_av_vendor_offload_start_aptx_adaptive(p_scb);
   } else {
     bta_av_offload_codec_builder(p_scb, &offload_start);
     bta_av_vendor_offload_start(p_scb, &offload_start);

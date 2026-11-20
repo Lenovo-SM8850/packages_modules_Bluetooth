@@ -60,7 +60,9 @@
 #include "common/state_machine.h"
 #include "device/include/device_iot_config.h"
 #include "hardware/bt_av.h"
+#include "hci/controller.h"
 #include "include/hardware/bt_rc.h"
+#include "main/shim/entry.h"
 #include "osi/include/alarm.h"
 #include "osi/include/allocator.h"
 #include "osi/include/properties.h"
@@ -72,6 +74,7 @@
 #include "stack/include/bt_uuid16.h"
 #include "stack/include/btm_ble_api.h"
 #include "stack/include/btm_log_history.h"
+#include "stack/include/hcidefs.h"
 #include "stack/include/main_thread.h"
 
 #ifdef __ANDROID__
@@ -1197,7 +1200,17 @@ void BtifAvSource::Init(btav_source_callbacks_t* callbacks, int max_connected_au
     BTM_BleGetVendorCapabilities(&vsc_cb);
     bool supports_a2dp_hw_offload_v2 =
             vsc_cb.version_supported >= 0x0104 && vsc_cb.a2dp_offload_v2_support;
-    bluetooth::audio::a2dp::update_codec_offloading_capabilities(offloading_preference,
+    std::vector<btav_a2dp_codec_config_t> preference = offloading_preference;
+    if (!supports_a2dp_hw_offload_v2 &&
+        bluetooth::shim::GetController()->GetLocalVersionInformation().manufacturer_name_ ==
+                LMP_COMPID_QTI) {
+      // This controller starts the codec with its legacy vendor command; the
+      // audio HAL capabilities decide whether it is finally enabled.
+      btav_a2dp_codec_config_t aptx_adaptive = {};
+      aptx_adaptive.codec_type = BTAV_A2DP_CODEC_INDEX_SOURCE_APTX_ADAPTIVE;
+      preference.push_back(aptx_adaptive);
+    }
+    bluetooth::audio::a2dp::update_codec_offloading_capabilities(preference,
                                                                  supports_a2dp_hw_offload_v2);
   }
 
