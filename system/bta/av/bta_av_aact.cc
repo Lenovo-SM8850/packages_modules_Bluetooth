@@ -3180,8 +3180,6 @@ static void bta_av_vendor_offload_start_aptx_adaptive(tBTA_AV_SCB* p_scb) {
   uint8_t param[66];
   uint8_t* p_param = param;
 
-  log::debug("");
-
   uint16_t mtu = std::min<uint16_t>(p_scb->stream_mtu, MAX_3MBPS_AVDTP_MTU);
   uint16_t acl_hdl = get_btm_client_interface().peer.BTM_GetHCIConnHandle(p_scb->PeerAddress(),
                                                                           BT_TRANSPORT_BR_EDR);
